@@ -1,0 +1,82 @@
+Controller: 接收網址與表單資料
+Service: 處理商品新增修改等流程
+DAO: 執行 SQL
+DTO: 傳遞商品資料
+JSP: 顯示畫面
+Filter: 統一處理 UTF-8
+
+-- SQL 資料表 --
+use mcdonald;
+
+-- 建立商品檔 --
+create table if not exists product (
+	id bigint primary key auto_increment,
+    name varchar(100) not null,
+    category enum('BURGER', 'SNACK', 'DRINK') not null,
+    price int not null,
+    stock int not null default 0,
+    image_base64 longtext,
+    image_type varchar(50),
+    create_at timestamp default current_timestamp,
+    update_at timestamp default current_timestamp on update current_timestamp
+)
+
+--建立訂單主檔--
+create table if not exists customer_order(
+    id bigint primary key auto_increment,
+    customer_name varchar(50) not null,
+    customer_phone varchar(50),
+    total_amount bigint not null,
+    status varchar(20) not null default 'PAID',
+    create_at timestamp default current_timestamp,
+    update_at timestamp default current_timestamp on update current_timestamp
+);
+--訂單明細檔--
+create table if not exists order_item(
+    id bigint primary key auto_increment,
+    order_id bigint not null,
+    product_id bigint not null,
+    product_name varchar(100) not null,
+    unit_price int not null,
+    quantity int not null,
+    subtotal bigint not null,
+    create_at timestamp default current_timestamp,
+    
+    constraint fk_order_item_order foreign key (order_id) references customer_order(id),
+    constraint fk_order_item_product foreign key (product_id) references product(id)
+);    
+
+-- 新增訂單 --
+use mcdonald;
+insert into customer_order (customer_name, customer_phone,  total_amount, status)
+values('John', '0912345678', 60, 'PAID');
+
+-- 修改庫存 --
+-- 數量扣 1
+update product 
+set stock = stock - 1
+where id = 1;
+
+-- 新增訂單項目 --
+-- 假設 order_id = 1 --
+-- 假設 product_id = 1 --
+insert into order_item (order_id, product_id, product_name, unit_price, quantity, subtotal)
+values(1, 1, '麥香魚', 60, 1, 60)
+
+-- 新增訂單 II --
+use mcdonald;
+insert into customer_order (customer_name, customer_phone,  total_amount, status)
+values('Mary', '0911111111', 60, 'PAID');
+
+-- 新增訂單項目 II --
+-- 假設 order_id = 2 --
+-- 假設 product_id = 9 --
+insert into order_item (order_id, product_id, product_name, unit_price, quantity, subtotal)
+values(2, 9, '大麥克', 80, 1, 80)
+
+-- 修改庫存 II --
+-- 數量扣 1
+update product 
+set stock = stock - 1
+where id = 9;
+

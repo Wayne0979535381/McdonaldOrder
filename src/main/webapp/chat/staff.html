@@ -1,10 +1,99 @@
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="UTF-8">
-<title>Insert title here</title>
-</head>
-<body>
+	<head>
+		<meta charset="UTF-8">
+		<title>後臺客服中心</title>
+		<link rel="stylesheet" href="/McdonaldOrder/chat/chat.css">
+	</head>
+	<body class="staff-chat-page">
+		<main class="staff-chat-container">
+			<div class="chat-header">
+				<div>
+					<strong>客服工作臺</strong>
+					<span id="chatStatus">尚未連線</span>
+				</div>
+			</div>
+			
+			<div id="chatMessages" class="chat-messages">
+				<div class="chat-welcome">等待顧客訊息</div>
+			</div>
+			
+			<div class="chat-input-area">
+				<input id="chatInput" type="text" maxlength="200" placeholder="輸入客服回覆..." disabled />
+				<button id="chatSendButton" type="button" disabled>送出</button>
+			</div>
+		</main>
+		
+		<script>
+			var socket = null;
+			var chatStatus = document.getElementById('chatStatus');
+			var chatMessages = document.getElementById('chatMessages');
+			var chatInput = document.getElementById('chatInput');
+			var chatSendButton = document.getElementById('chatSendButton');
+	
+			// 建立 WebSocket
+			var wsurl = 'ws://localhost:8080/McdonaldOrder/ws/chat';
+			socket = new WebSocket(wsurl);
+			chatStatus.innerHTML = '連線中...';
+			
+			socket.onopen = function() {
+				chatStatus.innerHTML = '已連線';
+				chatInput.disabled = false;
+				chatSendButton.disabled = false;
+			};
+			
+			socket.onmessage = function(e) {
+				showMessage(e.data);
+			};
+			
+			socket.onclose = function() {
+				chatStatus.innerHTML = '已關閉';
+				chatInput.disabled = true;
+				chatSendButton.disabled = true;
+			};
+			
+			socket.onerror = function() {
+				chatStatus.innerHTML = '連線錯誤';
+			};
+		
+			
+			// 按下送出按鈕
+			chatSendButton.onclick = function() {
+				var message = chatInput.value.trim();
 
-</body>
+				if (message != '' && socket.readyState == WebSocket.OPEN) {
+					socket.send('STAFF|' + message);
+					chatInput.value = '';
+					chatInput.focus();
+				}
+			};
+
+			// 在輸入框按 Enter 也可以送出
+			chatInput.onkeydown = function(event) {
+				if (event.key == 'Enter') {
+					chatSendButton.click();
+				}
+			};
+
+			// 顯示收到的訊息
+			function showMessage(data) {
+				var separator = data.indexOf('|');
+				var sender = data.substring(0, separator);
+				var content = data.substring(separator + 1);
+				var messageBox = document.createElement('div');
+
+				if (sender == 'CUSTOMER') {
+					messageBox.className = 'chat-message chat-message-customer';
+				} else {
+					messageBox.className = 'chat-message chat-message-staff';
+				}
+
+				messageBox.innerText = content;
+				chatMessages.appendChild(messageBox);
+				chatMessages.scrollTop = chatMessages.scrollHeight;
+			}
+		</script>
+		
+		
+	</body>
 </html>

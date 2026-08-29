@@ -5,8 +5,9 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>麥當勞餐點管理系統</title>
 
-	<link rel="stylesheet"
-		href="/McdonaldOrder/css/app.css">
+	<link rel="stylesheet" href="/McdonaldOrder/css/app.css">
+	<link rel="stylesheet" href="/McdonaldOrder/chat/chat.css">
+	
 </head>
 
 <body class="order-page">
@@ -202,9 +203,133 @@
 	</main>
 	
 	<!-- 浮動 Chat 按鈕 -->
-	<a href="#" class="floating-chat" title="線上客服">
+	<a href="#" id="chatButton" class="floating-chat" title="線上客服">
 		<span>💬</span>
 	</a>
+	
+	<!-- 浮動線上客服視窗 -->
+	<section id="chatPanel" class="chat-panel">
+		<div class="chat-header">
+			<div>
+				<strong>線上客服</strong>
+				<span id="chatStatus">尚未連線</span>
+			</div>
+			<button id="chatCloseButton" type="button" title="關閉">x</button>
+		</div>
+		
+		<div id="chatMessages" class="chat-messages">
+			<div class="chat-welcome">
+				您好 ! 請問需要什麼協助 ?
+			</div>
+		</div>
+		
+		<div class="chat-input-area">
+			<input id="chatInput" type="text" maxlength="200" placeholder="請輸入訊息..." disabled />
+			<button id="chatSendButton" type="button" disabled>送出</button>
+		</div>
+	</section>
+	
+	<script>
+		
+		var socket = null;
+		var chatButton = document.getElementById('chatButton');
+		var chatPanel = document.getElementById('chatPanel'); 
+		var chatCloseButton = document.getElementById('chatCloseButton');
+		var chatStatus = document.getElementById('chatStatus');
+		var chatMessage = document.getElementById('chatMessage');
+		var chatInput = document.getElementById('chatInput');
+		var chatSendButton = document.getElementById('chatSendButton');
+		
+		// 按下右下角的 Chat 按鈕
+		chatButton.onclick = function(e) {
+			// 將預設的 button 行為拿掉, 為的是要自訂 button 行為
+			e.preventDefault();
+			chatPanel.classList.add('chat-panel-open');
+			
+			// 判斷 websocket 連線
+			if(socket == null || socket.readyState == WebSocket.CLOSED) {
+				connectWebSocket();
+			} else if(socket.readyState == WebSocket.OPEN) {
+				chatInput.disabled = false;
+				chatSendButton.disabled = false;
+				chatInput.focus(); // 將游標移到訊息輸入框
+			}
+		}
+		
+		// 關閉聊天室
+		chatCloseButton.onclick = function(e) {
+			// 將預設的 button 行為拿掉, 為的是要自訂 button 行為
+			e.preventDefault();
+			chatPanel.classList.remove('chat-panel-open');
+		}
+		
+		// 建立 WebSocket 連線
+		function connectWebSocket() {
+			var wsurl = 'ws://localhost:8080/McdonaldOrder/ws/chat';
+			socket = new WebSocket(wsurl);
+			chatStatus.innerHTML = '連線中...';
+			
+			// WebSocket 建立成功
+			socket.onopen = function() {
+				chatStatus.innerHTML = '客服 online';
+				chatInput.disabled = false;
+				chatSendButton.disabled = false;
+				chatInput.focus(); // 將游標移到訊息輸入框
+			};
+			
+			// 收到伺服端訊息
+			socket.onmessage = function(e) {
+				//chatMessages.insertAdjacentHTML('afterbegin', e.data);
+				showMessage(e.data);
+			};
+			
+			// WebSocket 關閉
+			socket.onclose = function() {
+				chatStatus.innerHTML = '尚未連線';
+				chatInput.disabled = true;
+				chatSendButton.disabled = true;
+			};
+			
+			// WebSocket 錯誤
+			socket.onerror = function() {
+				chatStatus.innerHTML = '連線錯誤';
+			};
+			
+		}
+		
+		// 顯示收到訊息
+		function showMessage(data) {
+			var separator = data.indexOf('|');
+			var sender = data.substring(0, separator);
+			var content = data.substring(separator + 1);
+			var messageBox = document.createElement('div');
+			
+			if(sender == 'CUSTOMER') {
+				messageBox.className = 'chat-message chat-message-customer';
+			} else {
+				messageBox.className = 'chat-message chat-message-staff';
+			}
+			
+			messageBox.innerText = content;
+			chatMessages.appendChild(messageBox);
+			chatMessages.scrollTop = chatMessages.scrollHeight; // 將滾動條滾到最底部
+			
+		}
+		
+		// 按下送出鈕
+		chatSendButton.onclick = function() {
+			var message = chatInput.value.trim();
+			
+			if(message != '' && socket.readyState == WebSocket.OPEN) {
+				socket.send('CUSTOMER|' + message);
+				chatInput.value = '';
+				chatInput.focus();
+			}
+			
+		};
+		
+		
+	</script>
 	
 </body>
 </html>

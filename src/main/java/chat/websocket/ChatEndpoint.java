@@ -1,5 +1,6 @@
 package chat.websocket;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -35,7 +36,16 @@ public class ChatEndpoint {
 		sessions.add(session);
 		
 		// 將先前的訊息傳給剛加入的使用者
-		messageDao.findAll().forEach(message -> session.getAsyncRemote().sendText(format(message)));
+		messageDao.findAll()
+				  .forEach(message -> {
+					  try {
+						Thread.sleep(10);
+						} catch (Exception e) {
+							// TODO: handle exception
+						}
+					  session.getAsyncRemote().sendText(format(message));
+				  }
+		);
 	}
 	
 	@OnMessage
@@ -87,9 +97,13 @@ public class ChatEndpoint {
 	}
 	
 	@OnError
-	public void onError(Session session, Throwable error) {
+	public void onError(Session session, Throwable error) throws IOException {
 		System.err.printf("WebSocket 發生錯誤, session id: %s, error: %s%n", session.getId(), error);
-		throw new RuntimeException("WebSocket 發生錯誤, error: " + error);
+		if(session.isOpen()) {
+			session.close();
+			sessions.remove(session);
+		}
+		System.err.printf("WebSocket 發生錯誤, error: " + error);
 	}
 	
 	// 格式化 Chatmessage

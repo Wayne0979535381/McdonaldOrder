@@ -1,11 +1,16 @@
 package chat.websocket;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import chat.dao.ChatMessageDao;
 import chat.dao.MemoryChatMessageDao;
 import chat.model.ChatMessage;
+import jakarta.websocket.CloseReason;
+import jakarta.websocket.OnClose;
+import jakarta.websocket.OnError;
+import jakarta.websocket.OnMessage;
 import jakarta.websocket.OnOpen;
 import jakarta.websocket.Session;
 import jakarta.websocket.server.ServerEndpoint;
@@ -25,11 +30,66 @@ public class ChatEndpoint {
 	
 	@OnOpen
 	public void onOpen(Session session) {
-		sessions.add(session);
 		System.out.printf("聊天室已連線, session id: %s%n", session.getId());
+		
+		sessions.add(session);
 		
 		// 將先前的訊息傳給剛加入的使用者
 		messageDao.findAll().forEach(message -> session.getAsyncRemote().sendText(format(message)));
+	}
+	
+	@OnMessage
+	public void onMessage(String text, Session session) {
+		System.out.printf("收到訊息:%s, session id: %s%n", text, session.getId());
+		
+		// 瀏覽器送來的格式:CUSTOMER|訊息 或 STAFF|訊息
+		int separator = text.indexOf('|');
+		if(separator == -1) {
+			System.err.println("資料格式錯誤 !");
+			return;
+		}
+		
+		String sender = text.substring(0, separator);
+		String content = text.substring(separator+1).trim();
+		
+		if(!sender.equals("CUSTOMER") && !sender.equals("STAFF")) {
+			System.err.println("發送者(sender)錯誤 !");
+			return;
+		}
+		
+		if(content.isEmpty()) {
+			System.err.println("發送訊息是空的 !");
+			return;
+		}
+		
+		if(content.length() > 200) {
+			System.err.println("發送訊息過長被截斷 !");
+			content = content.substring(0, 200);
+		}
+		
+		ChatMessage message = new ChatMessage(sender, content, LocalDateTime.now());
+		messageDao.save(message);
+		
+		// 廣播給所有使用者 send all
+		sessions.forEach(s -> {
+			if(s.isOpen()) {
+				System.out.printf("廣播, session id: %s%n", s.getId());
+				s.getAsyncRemote().sendText(format(message));
+			}
+		});
+		
+	}
+	
+	@OnClose
+	public void onClose(Session session, CloseReason reason) {
+		System.out.printf("聊天室已離線, session id: %s, reason: %s%n", session.getId(), reason);
+		sessions.remove(session);
+	}
+	
+	@OnError
+	public void onError(Session session, Throwable error) {
+		System.err.printf("WebSocket 發生錯誤, session id: %s, error: %s%n", session.getId(), error);
+		throw new RuntimeException("WebSocket 發生錯誤, error: " + error);
 	}
 	
 	// 格式化 Chatmessage
